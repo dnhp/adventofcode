@@ -17,18 +17,14 @@ fn main() {
 	for c in contents.chars() {
 		if !garbage {
 			match c {
-
 				'{' => {
 					group_depth += 1;
 					n_groups +=1;
 				},
-				
 				'}' => {
 					score += group_depth;
 					group_depth -= 1;
 				},
-
-
 				'<' => garbage = true,
 				_ => {},
 			}
@@ -37,9 +33,7 @@ fn main() {
 			if !skip_next {
 				match c {
 					'!' => skip_next = true,
-
 					'>' => garbage = false,
-
 					_ => chars_in_garbage += 1,
 				}
 			}
