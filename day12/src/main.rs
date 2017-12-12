@@ -61,7 +61,7 @@ fn main() {
 }
 
 fn get_nodes_remaining (
-    remaining_nodes: & mut Vec<usize>,
+    remaining_nodes: &mut Vec<usize>,
     nodes_to_remove: &Vec<usize>) {
 
     remaining_nodes.retain(|node| !nodes_to_remove.contains(node));
