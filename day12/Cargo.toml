@@ -1,0 +1,8 @@
+[package]
+name = "day12"
+version = "0.1.0"
+authors = ["dnhp"]
+
+[dependencies]
+petgraph = "0.4.10"
+regex = "0.2"
