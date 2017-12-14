@@ -1,0 +1,7 @@
+[package]
+name = "day14"
+version = "0.1.0"
+authors = ["dnhp"]
+
+[dependencies]
+petgraph = "0.4.10"
