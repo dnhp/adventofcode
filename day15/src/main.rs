@@ -1,74 +1,85 @@
 use std::thread;
 use std::sync::{Arc, Mutex};
 
-fn main() {
+struct Generator {
+    factor: u64,
+    modulus: u64,
+    seed: u64,
+    current_val: u64,
+}
 
-    let factor_gen1: u64 = 16807;
-    let factor_gen2: u64 = 48271;
-
-    let modulus: u64 = 2147483647;
-
-    let seed_gen1: u64 = 783;
-    let seed_gen2: u64 = 325;
-
-    let num_pairs_p1 = 40_000_000;
-
-    let mut n_matches: usize = 0;
-
-    let mut current_val_gen1 = seed_gen1;
-    let mut current_val_gen2 = seed_gen2;
-
-    let bitmask = 65535; // 2^16 - 1, all lower 16 bits set for unsigned int
-    
-    for _ in 0..num_pairs_p1 {
-        generate_next_val_p1(&mut current_val_gen1, factor_gen1, modulus);
-        generate_next_val_p1(&mut current_val_gen2, factor_gen2, modulus);
-        if (current_val_gen1 & bitmask) == (current_val_gen2 & bitmask) {
-            n_matches += 1;
+impl Generator {
+    fn new (factor: u64, modulus: u64, seed: u64) -> Generator {
+        Generator {
+            factor,
+            modulus,
+            seed,
+            current_val: seed,
         }
     }
-    println!("Number of matches [part1]: {:?}", n_matches);
 
-    //let num_valid_values: usize = 5_000_000;
-    let num_pairs_p2: usize = 5_000_000;
+    fn reset (&mut self) {
+        self.current_val = self.seed;
+    }
 
-    // Reset generators
-    current_val_gen1 = seed_gen1;
-    current_val_gen2 = seed_gen2;
+    fn next (&mut self) -> u64 {
+        self.current_val = (self.current_val * self.factor) % self.modulus;
+        self.current_val
+    }
+
+    fn next_with_limit (&mut self, limit: u64) -> u64 {
+        loop {
+            let out = self.next();
+            if out & (limit-1) == 0 {
+                return out;
+            }
+        }
+    }
+}
+
+fn main() {
+
+    // Create two generators (factor, modulus, seed)
+    let mut gen1 = Generator::new(16807, 2147483647, 783);
+    let mut gen2 = Generator::new(48271, 2147483647, 325);
+
+    // Get first 40m results and check lower 16 bits with
+    // bitmask
+    let mut n_matches_p1 = 0;
+    for _ in 0..40_000_000 {
+        if (gen1.next() & 0xFFFF) == (gen2.next() & 0xFFFF) {
+            n_matches_p1 += 1;
+        }
+    }
+    println!("Number of matches [part1]: {:?}", n_matches_p1);
+
+    gen1.reset();
+    gen2.reset();
 
     // Prepare empty vectors with length 5,000,000 to be passed mutably to
     // new threads.
-    let gen1_valid_values = Arc::new(Mutex::new(Vec::with_capacity(num_pairs_p2)));
-    let gen2_valid_values = Arc::new(Mutex::new(Vec::with_capacity(num_pairs_p2)));
+    let gen1_valid_values = Arc::new(Mutex::new(Vec::with_capacity(5_000_000)));
+    let gen2_valid_values = Arc::new(Mutex::new(Vec::with_capacity(5_000_000)));
 
     // Get additional pointers to memory to be passed to threads. Threads take
     // ownership of these pointers
-    let g1_clone = gen1_valid_values.clone();
-    let g2_clone = gen2_valid_values.clone();
+    let gen1_clone_ptr = gen1_valid_values.clone();
+    let gen2_clone_ptr = gen2_valid_values.clone();
 
-    let gen1_multipleof = 4;
-    let gen2_multipleof = 8;
-    
-    // Spawn two threads, each handling one generator
+    // Spawn two threads, one for each generator.
+    // Threads take ownership of generators and drop
+    // them.
     let handle1 = thread::spawn(move || {
-        let mut g1_clone = g1_clone.lock().unwrap();
-        for _ in 0..num_pairs_p2 {
-            g1_clone.push(
-                generate_next_val_p2(&mut current_val_gen1,
-                    factor_gen1,
-                    modulus,
-                    gen1_multipleof));
+        let mut gen1_clone_ptr = gen1_clone_ptr.lock().unwrap();
+        for _ in 0..5_000_000 {
+            gen1_clone_ptr.push(gen1.next_with_limit(4));
         }
     });
 
     let handle2 = thread::spawn(move || {
-        let mut g2_clone = g2_clone.lock().unwrap();
-        for _ in 0..num_pairs_p2 {
-            g2_clone.push(
-                generate_next_val_p2(&mut current_val_gen2,
-                    factor_gen2,
-                    modulus,
-                    gen2_multipleof));
+        let mut gen2_clone_ptr = gen2_clone_ptr.lock().unwrap();
+        for _ in 0..5_000_000 {
+            gen2_clone_ptr.push(gen2.next_with_limit(8));
         }
     });
 
@@ -76,46 +87,18 @@ fn main() {
     // their results vectors
     handle1.join().unwrap();
     handle2.join().unwrap();
-
+    
     // Get values in vectors returned from threads
-    let g1_vals = gen1_valid_values.lock().unwrap();
-    let g2_vals = gen2_valid_values.lock().unwrap();
+    let g1_vals = &gen1_valid_values.lock().unwrap();
+    let g2_vals = &gen2_valid_values.lock().unwrap();
 
     // Check for matches in lower 16 bits by masking
     // with 0xFFFF and comparing results
     let mut n_matches_p2 = 0;
-
-    for el in g1_vals.iter().zip(g2_vals.iter()) {
-        if (el.0 & bitmask) == (el.1 & bitmask) {
+    for (g1_val,g2_val) in g1_vals.iter().zip(g2_vals.iter()) {
+        if (g1_val & 0xFFFF) == (g2_val & 0xFFFF) {
             n_matches_p2 += 1;
         }
     }
     println!("Number of matches [part2]: {:?}", n_matches_p2);
-}
-
-fn generate_next_val_p1 (
-    current_val: &mut u64,
-    factor: u64,
-    modulus: u64) {
-
-    *current_val = (*current_val * factor) % modulus;
-}
-
-fn generate_next_val_p2 (
-    current_val: &mut u64,
-    factor: u64,
-    modulus: u64,
-    multiple_of: u64) -> u64 {
-
-    // Checks if generated value is a multiple of multiple_of
-    // by masking with multiple_of-1 and comparing with zero.
-    // As in this case multiple_of is 4 or 8 (powers of two) we
-    // can just check whether the bits below 4 or 8 are set.
-    // E.g. to check if multiple of 8, mask with 0b0111.
-    loop {
-        generate_next_val_p1(current_val, factor, modulus);
-        if *current_val & (multiple_of-1) == 0 {
-            return *current_val
-        }
-    }
 }
