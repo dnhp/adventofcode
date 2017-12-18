@@ -43,6 +43,29 @@ impl Program {
         }
     }
 
+    fn resolve_char (&self, input_char: char) -> i64 {
+
+        if input_char.is_numeric() { // Is a literal value
+            input_char.to_digit(10).unwrap() as i64
+        }
+        else { // Is a letter referring to another register.
+            *self.registers.get(&input_char).unwrap()
+        }
+    }
+
+    fn resolve_str (&self, input_string: &str) -> i64 {
+
+        if let Ok(literal_val) = input_string.parse::<i64>() {
+            literal_val
+        }
+        else { // Is a letter referring to another register.
+            *self.registers.get(
+                &input_string.chars()
+                    .nth(0).unwrap())
+                .unwrap()
+        }
+    }
+
     fn run (&mut self) {
 
         while !self.halt {
@@ -59,20 +82,10 @@ impl Program {
                 "set" => {
                     // Setting register to a value. Assume first arg is
                     // always a register letter and never a literal val
-                    let reg_char = &inst.1;
-                    let new_val = if let Ok(literal_val) = inst.2.parse::<i64>() {
-                        literal_val
-                    }
-                    else {
-                        // Is a letter referring to another register. This branch
-                        // taken if parse() returns Err(), meaning it's not a number.
-                        *self.registers.get(
-                            &inst.2.chars()
-                                .nth(0).unwrap())
-                            .unwrap()
-                    };
 
-                    let reg = self.registers.entry(*reg_char).or_insert(0);
+                    let new_val = self.resolve_str(&inst.2);
+
+                    let reg = self.registers.entry(inst.1).or_insert(0);
                     *reg = new_val;
                     self.pc += 1;
                 },
@@ -80,44 +93,21 @@ impl Program {
                 "mul" => {
                     // Set register X to product of X and Y. Assume first arg is.
                     // always a register letter and never a literal val
-                    let reg_char = &inst.1;
-                    let val_in_reg = self.registers.get(reg_char).unwrap().clone();
 
-                    let new_val = if let Ok(literal_val) = inst.2.parse::<i64>() {
-                        literal_val
-                    }
-                    else { // Is a letter referring to another register
-                        *self.registers.get(
-                            &inst.2.chars()
-                                .nth(0).unwrap())
-                            .unwrap()
-                    };
+                    let val_in_reg = self.resolve_char(inst.1);
+                    let new_val = self.resolve_str(&inst.2);
 
-                    let reg = self.registers.entry(*reg_char).or_insert(0);
+                    let reg = self.registers.entry(inst.1).or_insert(0);
+
                     *reg = val_in_reg * new_val;
                     self.pc += 1;
                 },
 
                 "jgz" => {
                     // Jump with offset Y if X > 0
-                    let val_if_gz = if inst.1.is_numeric() { // Is a literal value
-                        inst.1.to_digit(10).unwrap() as i64
-                    }
-                    else { // Is a letter referring to another register.
-                        *self.registers.get(&inst.1).unwrap()
-                    };
+                    let val_if_gz = self.resolve_char(inst.1);
 
-                    let offset = if let Ok(literal_val) = inst.2.parse::<i64>() {
-                        literal_val
-                    }
-                    else {
-                        // Is a letter referring to another register. This branch
-                        // taken if parse() returns Err(), meaning it's not a number.
-                        *self.registers.get(&inst.2.chars()
-                                .nth(0)
-                                .unwrap())
-                            .unwrap()
-                    };
+                    let offset = self.resolve_str(&inst.2);
 
                     if val_if_gz > 0 {
                         self.pc += offset as i32;
@@ -130,56 +120,30 @@ impl Program {
                 "add" => {
                     // Increment register X by Y. Assume first arg is.
                     // always a register letter and never a literal val
-                    let reg_char = &inst.1;
-                    let val_in_reg = self.registers.get(reg_char).unwrap().clone();
 
-                    let new_val = if let Ok(literal_val) = inst.2.parse::<i64>() {
-                        literal_val
-                    }
-                    else { // Is a letter referring to another register
-                        *self.registers.get(
-                            &inst.2.chars()
-                                .nth(0).unwrap())
-                            .unwrap()
-                    };
+                    let val_in_reg = self.resolve_char(inst.1);
+                    let new_val = self.resolve_str(&inst.2);
 
-                    let reg = self.registers.entry(*reg_char).or_insert(0);
+                    let reg = self.registers.entry(inst.1).or_insert(0);
                     *reg = val_in_reg + new_val;
                     self.pc += 1;
                 },
 
                 "mod" => {
-
                     // Set register X to X % Y. Assume first arg is.
                     // always a register letter and never a literal val
-                    let reg_char = &inst.1;
-                    let val_in_reg = self.registers.get(reg_char).unwrap().clone();
 
-                    let new_val = if let Ok(literal_val) = inst.2.parse::<i64>() {
-                        literal_val
-                    }
-                    else { // Is a letter referring to another register
-                        *self.registers.get(
-                            &inst.2.chars()
-                                .nth(0).unwrap())
-                            .unwrap()
-                    };
+                    let val_in_reg = self.resolve_char(inst.1);
+                    let new_val = self.resolve_str(&inst.2);
 
-                    let reg = self.registers.entry(*reg_char).or_insert(0);
+                    let reg = self.registers.entry(inst.1).or_insert(0);
                     *reg = val_in_reg % new_val;
                     self.pc += 1;
                 },
 
                 "snd" => {
 
-                    let val_to_send = if inst.1.is_numeric() {
-                        // Is a literal value
-                        inst.1.to_digit(10).unwrap() as i64
-                    }
-                    else { // Is a letter referring to another register.
-                        *self.registers.get(&inst.1).unwrap()
-                    };
-
+                    let val_to_send = self.resolve_char(inst.1);
                     self.sender.send(val_to_send).unwrap();
                     self.vals_sent.push(val_to_send);
 
