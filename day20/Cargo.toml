@@ -6,3 +6,4 @@ authors = ["David Parnell <>"]
 [dependencies]
 regex = "0.2"
 nalgebra = "0.10.*"
+integer-sqrt = "0.1.0"
