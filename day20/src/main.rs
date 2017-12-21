@@ -11,7 +11,7 @@ fn main() {
 
     let input_file = File::open("input.txt").unwrap();
     let buf = BufReader::new(input_file);
-;
+
     let re = Regex::new(r"p=<(-?\d+),(-?\d+),(-?\d+)>, v=<(-?\d+),(-?\d+),(-?\d+)>, a=<(-?\d+),(-?\d+),(-?\d+)>").unwrap();
 
     let mut pos_vec: Vec<(isize,isize,isize)> = Vec::new();
@@ -99,7 +99,6 @@ fn main() {
     let mut col_m_cl = collision_t_matrix.clone();
 
     for p1 in 0..pos_vec.len()-1 {
-
         for p2 in p1+1..pos_vec.len() {
           let cp_val = col_m_cl[p1][p2];
           col_m_cl[p2][p1] = cp_val;
